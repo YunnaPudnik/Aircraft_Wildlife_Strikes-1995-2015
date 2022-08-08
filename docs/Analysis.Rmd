@@ -1,0 +1,250 @@
+---
+title: "Aircraft Wildlife Strikes Analysis"
+author: "Yunna Pudnik"
+date: "July 27, 2022"
+output: html_document
+---
+
+
+**Dataset:** The wildlife strike database was compiled from reports received from airports, airlines, and pilots and published by the Federal Aviation Association.
+
+[Click here to download](https://www.kaggle.com/datasets/faa/wildlife-strikes)
+
+
+
+**Task:** 
+
+1. How the number of strikes change over time? 
+
+2. What is the most damaged part of the aircraft?
+
+3. What bird species has caused the most damage to airplanes?
+
+4. What flight phase is affected by wild life strikes the most?
+
+5. What airports are affected by Wild Life Strikes?
+
+
+
+
+Load in the required R packages and data set:
+
+```{r setup, fig.width=4, fig.height=3, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(kableExtra)
+library(ggplot2)
+library(janitor)
+library(scales)
+library("reshape2")
+
+strikes <- read.csv("D:/users/yunka/Desktop/My Data/R Projects/Aircraft_wildlife_strikes/aircraft_wildlife_strikes.csv")
+```
+
+Let's have a look at the first 6 rows of data:
+
+```{r}
+aircraft_strikes <- head(strikes)
+kable(aircraft_strikes) %>%
+  kable_styling(bootstrap_options = "striped", font_size=10, full_width=F)
+```
+
+Duplicates Check:
+
+```{r}
+sum(duplicated(strikes))
+```
+  
+**Number of Strikes Over Time:**
+
+```{r}
+strikes_by_year <- strikes %>%
+  group_by(Incident.Year) %>%
+  summarise(total_strikes = n())
+
+strikes_by_year %>%
+  ggplot(aes(Incident.Year, total_strikes))+
+  geom_line(color="blue", size = 1)  +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        legend.position = "none") +
+  labs(y = "Number of Strikes")+
+  scale_x_continuous(breaks = c(1990, 1995, 2000, 2005, 2010, 2015)) +
+  scale_y_continuous(breaks = c(2000, 6000, 10000, 14000)) 
+```
+
+**Number of Strikes by Month:**
+
+```{r}
+strikes_by_mon <- strikes %>%
+  group_by(Incident.Month) %>%
+  summarise(total_strikes = n())
+
+strikes_by_mon %>%
+  ggplot(aes(Incident.Month, total_strikes))+
+  geom_line(color="light blue", size = 1)  +
+  geom_point(color = "blue", size = 2)+
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        legend.position = "none") +
+  labs(y = "Number of Strikes")+
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)) 
+
+
+```
+
+
+**Damage by Part of the Plane:**
+
+```{r}
+damage_by_species <- strikes %>%
+  select(Species.Name, Radome.Damage, Windshield.Damage, Nose.Damage, Engine1.Damage, Engine2.Damage, Engine3.Damage, Engine4.Damage, Propeller.Damage, Wing.or.Rotor.Damage, Fuselage.Damage, Landing.Gear.Damage, Tail.Damage, Lights.Damage) %>%
+  mutate_all(na_if,"") %>%
+  drop_na()
+
+damage_by_species <- damage_by_species %>%
+  group_by(Species.Name) %>%
+summarise(across(everything(), list(sum)))
+
+damage_by_species <- melt(damage_by_species ,  id.vars = 'Species.Name', variable.name = 'Damage')
+
+damage_by_species$value <- as.numeric(damage_by_species$value)
+
+damage_by_species <- damage_by_species %>% 
+  group_by(Damage) %>% 
+  summarise(value = sum(value))
+
+
+damage_by_species %>%
+  ggplot(aes(value, reorder(Damage, -value), fill=value))+
+  geom_bar(width = 0.7, stat = "identity") +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        axis.title.y= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.text.x=element_text(hjust = 0.5, vjust = 0.6, size = 10),
+        legend.position = "none") + scale_y_discrete(labels = c('Wing.or.Rotor', 'Engine1', 'Engine2', 'Radome', 'Nose', 'Windshield', 'Landing.Gear', 'Fuselage', 'Lights', 'Tail',  'Propeller', 'Engine3', 'Engine4'))
+
+  
+```
+
+**Strikes by Bird Species:**
+
+```{r}
+strikes_by_species <- strikes %>%
+  group_by(Species.Name) %>%
+  summarise(total_strikes = n()) %>%
+  mutate_all(na_if,"") %>%
+  drop_na()
+
+strikes_by_species %>%
+  arrange(desc(total_strikes)) %>%
+    slice(1:10) %>%
+  ggplot(aes(total_strikes, reorder(Species.Name, -total_strikes), fill=total_strikes))+
+  geom_bar(width = 0.7, stat = "identity") +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        axis.title.y= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.text.x=element_text( hjust = 0.5, vjust = 0.6, size = 10),
+        legend.position = "none")+
+  scale_x_continuous(breaks = c(5000, 15000, 25000, 35000)) +
+  scale_fill_gradient(low="light blue", high="dark blue")
+
+```
+
+**Strikes by Flight Phase:**
+
+```{r}
+strikes_by_phase <- strikes %>%
+  group_by(Flight.Phase) %>%
+  summarise(total_strikes = n()) %>%
+  mutate_all(na_if,"") %>%
+  drop_na()
+
+
+strikes_by_phase %>%
+  ggplot(aes(total_strikes, reorder(Flight.Phase, -total_strikes), fill=total_strikes))+
+  geom_bar(width = 0.7, stat = "identity") +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        axis.title.y= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.text.x=element_text( hjust = 0.5, vjust = 0.6, size = 10),
+        legend.position = "none") +
+  labs(y = "Number of Strikes")+
+  scale_fill_gradient(low="light blue", high="dark blue")
+
+
+```
+
+**Strikes by Type of Aircraft:**
+
+```{r}
+
+strikes_by_type <- strikes %>%
+  group_by(Aircraft) %>%
+  summarise(total_strikes = n()) %>%
+  mutate_all(na_if,"UNKNOWN") %>%
+  drop_na()
+
+strikes_by_type %>%
+  arrange(desc(total_strikes)) %>%
+    slice(1:10) %>%
+  ggplot(aes(total_strikes, reorder(Aircraft, -total_strikes), fill=total_strikes))+
+  geom_bar(width = 0.7, stat = "identity") +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        axis.title.y= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.text.x=element_text( hjust = 0.5, vjust = 0.6, size = 10),
+        legend.position = "none")+
+  scale_x_continuous(breaks = c(1000, 5000, 9000)) +
+  scale_fill_gradient(low="light blue", high="dark blue")
+
+```
+
+
+**Airports affected by Wild Strikes:**
+
+```{r}
+strikes_by_airport <- strikes %>%
+  group_by(Airport.ID) %>%
+  summarise(total_strikes = n()) %>%
+  mutate_all(na_if,"ZZZZ") %>%
+  drop_na()
+
+strikes_by_airport %>%
+  arrange(desc(total_strikes)) %>%
+    slice(1:10) %>%
+  ggplot(aes(total_strikes, reorder(Airport.ID, -total_strikes), fill=total_strikes))+
+  geom_bar(width = 0.7, stat = "identity") +
+  theme_bw() +
+  theme(axis.title.x= element_blank(),
+        axis.title.y= element_blank(),
+        panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.text.x=element_text( hjust = 0.5, vjust = 0.6, size = 10),
+        legend.position = "none") +
+  scale_fill_gradient(low="light blue", high="dark blue")
+
+```
+
+
+
+**Conclusion:**
+
+Number of strikes reported have grown up over time, but we can see fair decrease between 2014 and 2015. Number of accidents increases on July, reaches its peak on August (around 25K) and decreases by December (around 7K).
+
+The most vulnerable parts of the aircraft are Wings, Rotor, and Engine 1 and 2, which mostly get stroke by Birds of Small and Medium size, and also by Mourning Doves and Gulls. Most of the strikes happen when aircraft is either approaching, taking off or landing.
+
+However, the most affected types of aircraft are Boeing-737-300 and Boeing-737-700, Airbus A320, and Bombardier CRJ100/200.
+
+The biggest part of wild strikes happen in Denver International Airport(KDEN), Dallas International Airport(KDWF), and O'Hare International Airport(KORD).
